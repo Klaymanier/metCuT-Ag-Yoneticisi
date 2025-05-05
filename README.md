@@ -1,4 +1,4 @@
-# MetCut - Ağ Yönetim Aracı
+# metCuT - Ağ Yönetim Aracı
 
 [![Lisans](https://img.shields.io/badge/Lisans-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.7%2B-blue)](https://www.python.org/)
