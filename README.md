@@ -37,7 +37,7 @@ pip install scapy ttkthemes
 
 2. Repoyu klonlayın:
 ```bash
-git clone https://github.com/kullaniciadi/metcut.git
+git clone https://github.com/klaymanier/metcut.git
 cd metcut
 ```
 
